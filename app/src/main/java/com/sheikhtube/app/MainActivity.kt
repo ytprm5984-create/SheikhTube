@@ -30,7 +30,9 @@ class MainActivity : Activity() {
     private val blockedHosts = listOf(
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
         "adservice.google.com", "scorecardresearch.com", "taboola.com",
-        "outbrain.com", "adnxs.com", "criteo.com", "quantserve.com"
+        "outbrain.com", "adnxs.com", "criteo.com", "quantserve.com",
+        "amazon-adsystem.com", "adsrvr.org", "rubiconproject.com",
+        "pubmatic.com", "openx.net", "casalemedia.com", "moatads.com"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,19 +124,23 @@ class MainActivity : Activity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || isInPictureInPictureMode) return
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isInPictureInPictureMode) {
-            web.evaluateJavascript(
-                "(function(){var v=document.querySelector('video');return !!(v && !v.paused && !v.ended);})()"
-            ) { result ->
-                if (result == "true") {
+        web.evaluateJavascript(
+            "(function(){var v=document.querySelector('video');if(!v||v.paused||v.ended)return 'idle';try{if(!document.fullscreenElement&&v.requestFullscreen)v.requestFullscreen();else if(!document.webkitFullscreenElement&&v.webkitRequestFullscreen)v.webkitRequestFullscreen();}catch(e){}return 'playing';})()"
+        ) { result ->
+            if (result.contains("playing")) {
+                settingsButton.visibility = View.GONE
+                Handler(Looper.getMainLooper()).postDelayed({
                     try {
                         val params = PictureInPictureParams.Builder()
                             .setAspectRatio(android.util.Rational(16, 9))
                             .build()
                         enterPictureInPictureMode(params)
-                    } catch (_: Exception) {}
-                }
+                    } catch (_: Exception) {
+                        settingsButton.visibility = View.VISIBLE
+                    }
+                }, 180)
             }
         }
     }
@@ -144,9 +150,8 @@ class MainActivity : Activity() {
         newConfig: android.content.res.Configuration
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-
-        settingsButton.visibility =
-            if (isInPictureInPictureMode) View.GONE else View.VISIBLE
+        settingsButton.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
+        if (!isInPictureInPictureMode && customView == null) web.visibility = View.VISIBLE
     }
 
     private fun showSettings() {
@@ -197,7 +202,7 @@ class MainActivity : Activity() {
     }
 
     private fun showWhatsNew() {
-        AlertDialog.Builder(this).setTitle("What's New in Sheikh Tube V2")
+        AlertDialog.Builder(this).setTitle("What's New in Sheikh Tube V2.1")
             .setMessage("• Clean YouTube-first interface\n• URL/GO bar removed\n• Fullscreen video improvements\n• Picture-in-Picture support\n• Always-on ad/tracker host protection\n• Popup protection\n• Automatic GitHub update checks\n• Branded update screen\n• Developer card & WhatsApp contact\n• Loading and stability improvements")
             .setPositiveButton("OK", null).show()
     }
