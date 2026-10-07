@@ -1,8 +1,18 @@
-# Sheikh Tube
-Android WebView browser starter with a default-on content blocker for common third-party ad/tracker hosts, search/address navigation, YouTube mobile home, and local settings.
+# Sheikh Tube V2
 
-## Build without Android Studio
-Push this folder to GitHub, open Actions > Build Android APK > Run workflow, then download the SheikhTube-debug-apk artifact.
+Personal Android WebView app focused on the YouTube mobile site.
 
-## Important limitation
-The blocker filters known network hosts in pages loaded through Android WebView. It does not guarantee removal of every advertisement or sponsored element, especially first-party/server-inserted advertising.
+## V2
+- Clean YouTube-first UI (URL/GO bar removed)
+- Fullscreen video and Android Picture-in-Picture support
+- Always-on known ad/tracker host filtering and popup protection
+- Automatic GitHub Release update checks
+- Branded update dialog with Update Now
+- About/Developer card with Sheikh Sojib and WhatsApp 01823315984
+- Loading indicator, WebView history navigation, cache clearing
+
+## Important limitations
+Filtering known hosts does not guarantee removal of every YouTube ad, especially first-party/server-inserted advertising. Background playback behavior depends on the media site/WebView and Android; the app does not bypass site restrictions.
+
+## Updates
+The updater reads the latest GitHub Release. Release APKs must always be signed with the same private signing key. Configure the repository Actions secrets before publishing a `v*` tag.
