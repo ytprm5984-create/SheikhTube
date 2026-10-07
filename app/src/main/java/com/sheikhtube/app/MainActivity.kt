@@ -122,9 +122,31 @@ class MainActivity : Activity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && customView != null) {
-            try { enterPictureInPictureMode(PictureInPictureParams.Builder().build()) } catch (_: Exception) {}
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isInPictureInPictureMode) {
+            web.evaluateJavascript(
+                "(function(){var v=document.querySelector('video');return !!(v && !v.paused && !v.ended);})()"
+            ) { result ->
+                if (result == "true") {
+                    try {
+                        val params = PictureInPictureParams.Builder()
+                            .setAspectRatio(android.util.Rational(16, 9))
+                            .build()
+                        enterPictureInPictureMode(params)
+                    } catch (_: Exception) {}
+                }
+            }
         }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: android.content.res.Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+
+        settingsButton.visibility =
+            if (isInPictureInPictureMode) View.GONE else View.VISIBLE
     }
 
     private fun showSettings() {
