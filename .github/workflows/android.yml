@@ -25,7 +25,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
-          name: SheikhTube-V2-debug
+          name: SheikhTube-V2.1-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Restore release signing key

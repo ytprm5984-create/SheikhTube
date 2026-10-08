@@ -24,6 +24,9 @@ class MainActivity : Activity() {
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
     private var updateDownloadId: Long = -1L
+    private var audioMode = false
+    private lateinit var audioPanel: LinearLayout
+    private var pipPrepared = false
 
     private val homeUrl = "https://m.youtube.com/"
     private val releaseApi = "https://api.github.com/repos/ytprm5984-create/SheikhTube/releases/latest"
@@ -31,6 +34,7 @@ class MainActivity : Activity() {
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
         "adservice.google.com", "scorecardresearch.com", "taboola.com",
         "outbrain.com", "adnxs.com", "criteo.com", "quantserve.com",
+        "amazon-adsystem.com", "adsrvr.org", "rubiconproject.com", "pubmatic.com", "openx.net",
         "amazon-adsystem.com", "adsrvr.org", "rubiconproject.com",
         "pubmatic.com", "openx.net", "casalemedia.com", "moatads.com"
     )
@@ -44,8 +48,10 @@ class MainActivity : Activity() {
         progress = findViewById(R.id.progress)
         settingsButton = findViewById(R.id.settings)
 
+        createAudioPanel()
         configureWebView()
         settingsButton.setOnClickListener { showSettings() }
+        findViewById<ImageButton>(R.id.audio).setOnClickListener { toggleAudioMode() }
 
         if (savedInstanceState == null) web.loadUrl(homeUrl) else web.restoreState(savedInstanceState)
         checkForUpdates(false)
@@ -122,36 +128,64 @@ class MainActivity : Activity() {
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
     }
 
+    private fun videoJs(code: String) {
+        web.evaluateJavascript("(function(){var v=document.querySelector('video');if(v){" + code + "}})();", null)
+    }
+
+    private fun createAudioPanel() {
+        audioPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(22), dp(24), dp(22), dp(24))
+            setBackgroundColor(Color.rgb(13, 15, 20))
+            visibility = View.GONE
+        }
+        audioPanel.addView(text("🎧  SHEIKH TUBE AUDIO", 24, Color.WHITE, true))
+        audioPanel.addView(text("\nAudio-focused controls\nPlayback depends on the website", 15, Color.LTGRAY, false))
+        audioPanel.addView(button("⏮  Previous") { web.evaluateJavascript("history.back()", null) })
+        audioPanel.addView(button("⏯  Play / Pause") { videoJs("if(v.paused){v.play()}else{v.pause()}") })
+        audioPanel.addView(button("⏭  Next") { web.evaluateJavascript("history.forward()", null) })
+        audioPanel.addView(button("▶  Return to Video") { toggleAudioMode() })
+        findViewById<ViewGroup>(R.id.root).addView(audioPanel, ViewGroup.LayoutParams(-1, -1))
+    }
+
+    private fun toggleAudioMode() {
+        audioMode = !audioMode
+        audioPanel.visibility = if (audioMode) View.VISIBLE else View.GONE
+        settingsButton.visibility = if (audioMode) View.GONE else View.VISIBLE
+        findViewById<ImageButton>(R.id.audio).visibility = if (audioMode) View.GONE else View.VISIBLE
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || isInPictureInPictureMode) return
-
-        web.evaluateJavascript(
-            "(function(){var v=document.querySelector('video');if(!v||v.paused||v.ended)return 'idle';try{if(!document.fullscreenElement&&v.requestFullscreen)v.requestFullscreen();else if(!document.webkitFullscreenElement&&v.webkitRequestFullscreen)v.webkitRequestFullscreen();}catch(e){}return 'playing';})()"
-        ) { result ->
-            if (result.contains("playing")) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || isInPictureInPictureMode || audioMode) return
+        web.evaluateJavascript("(function(){var v=document.querySelector('video');return !!(v&&!v.paused&&!v.ended)})()") { playing ->
+            if (playing == "true") {
+                // Preserve the player in its original DOM. Enlarge its rendering surface for PiP.
+                pipPrepared = true
+                web.evaluateJavascript("(function(){var v=document.querySelector('video');if(!v)return;v.dataset.stOldStyle=v.getAttribute('style')||'';v.style.cssText+=';position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;object-fit:contain!important;background:black!important;z-index:2147483647!important';})()", null)
                 settingsButton.visibility = View.GONE
+                findViewById<ImageButton>(R.id.audio).visibility = View.GONE
                 Handler(Looper.getMainLooper()).postDelayed({
-                    try {
-                        val params = PictureInPictureParams.Builder()
-                            .setAspectRatio(android.util.Rational(16, 9))
-                            .build()
-                        enterPictureInPictureMode(params)
-                    } catch (_: Exception) {
-                        settingsButton.visibility = View.VISIBLE
-                    }
-                }, 180)
+                    try { enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(16,9)).build()) }
+                    catch (_: Exception) { restorePip() }
+                }, 220)
             }
         }
     }
 
-    override fun onPictureInPictureModeChanged(
-        isInPictureInPictureMode: Boolean,
-        newConfig: android.content.res.Configuration
-    ) {
+    private fun restorePip() {
+        if (pipPrepared) {
+            web.evaluateJavascript("(function(){var v=document.querySelector('video');if(v){v.setAttribute('style',v.dataset.stOldStyle||'');delete v.dataset.stOldStyle}})()", null)
+            pipPrepared = false
+        }
+        settingsButton.visibility = View.VISIBLE
+        findViewById<ImageButton>(R.id.audio).visibility = View.VISIBLE
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        settingsButton.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
-        if (!isInPictureInPictureMode && customView == null) web.visibility = View.VISIBLE
+        if (!isInPictureInPictureMode) restorePip()
     }
 
     private fun showSettings() {
@@ -180,7 +214,7 @@ class MainActivity : Activity() {
         container.addView(button("Clear Cache") {
             web.clearCache(true); Toast.makeText(this, "Cache cleared", Toast.LENGTH_SHORT).show()
         })
-        container.addView(text("\nAd & tracker protection: Always ON\nPlayback features: Always ON", 14, Color.LTGRAY, false))
+        container.addView(text("\nAd & tracker protection: Always ON\nPiP: Enabled when supported\nAudio controls: Available\nAuto Update: Always ON", 14, Color.LTGRAY, false))
 
         AlertDialog.Builder(this).setTitle("About & Developer").setView(container)
             .setNegativeButton("Close", null).show()
@@ -202,7 +236,7 @@ class MainActivity : Activity() {
     }
 
     private fun showWhatsNew() {
-        AlertDialog.Builder(this).setTitle("What's New in Sheikh Tube V2.1")
+        AlertDialog.Builder(this).setTitle("What's New in Sheikh Tube V2.1.1")
             .setMessage("• Clean YouTube-first interface\n• URL/GO bar removed\n• Fullscreen video improvements\n• Picture-in-Picture support\n• Always-on ad/tracker host protection\n• Popup protection\n• Automatic GitHub update checks\n• Branded update screen\n• Developer card & WhatsApp contact\n• Loading and stability improvements")
             .setPositiveButton("OK", null).show()
     }

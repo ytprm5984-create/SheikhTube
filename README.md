@@ -16,3 +16,11 @@ Filtering known hosts does not guarantee removal of every YouTube ad, especially
 
 ## Updates
 The updater reads the latest GitHub Release. Release APKs must always be signed with the same private signing key. Configure the repository Actions secrets before publishing a `v*` tag.
+
+
+## V2.1 notes
+- Version 2.1, audio-focused in-app controls, experimental video-only PiP rendering, expanded third-party host blocking.
+- Audio Mode does not guarantee YouTube background playback. Previous/Next use WebView history rather than YouTube playlist navigation.
+- PiP is experimental and may still show page elements depending on YouTube's DOM/player behavior.
+- YouTube first-party ads are not guaranteed to be blocked.
+- Auto-updates require a published, correctly signed GitHub Release; a debug APK cannot be upgraded with a differently signed release APK.
